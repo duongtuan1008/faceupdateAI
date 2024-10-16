@@ -1,45 +1,60 @@
+import time
+import picamera2
+import RPi.GPIO as GPIO  # Đảm bảo đã import thư viện GPIO
 from email.message import EmailMessage
-import mimetypes
 import smtplib
 
-def SendEmail(sender, pass_sender, reciever, image):
-    Sender_Email = sender
-    Reciever_Email = reciever
-    Password = pass_sender 
-    
-    # T?o m?t EmailMessage m?i
-    newMessage = EmailMessage() 
-    newMessage['Subject'] = "C?NH BÁO !!!" 
-    newMessage['From'] = Sender_Email 
-    newMessage['To'] = Reciever_Email 
-    
-    # Thi?t l?p n?i dung email v?i van b?n
-    text_content = 'C?NH BÁO AN NINH: Du?i dây là hình ?nh c?n xem xét.'
-    newMessage.set_content(text_content) 
-    
-    # M? t?p hình ?nh và d?c d? li?u
-    try:
-        with open(image, 'rb') as f:
-            image_data = f.read()
-            image_type, _ = mimetypes.guess_type(f.name)  # Xác d?nh lo?i hình ?nh
-            image_name = f.name.split("/")[-1]  # L?y tên t?p hình ?nh
-            
-            # Thêm t?p hình ?nh vào email
-            newMessage.add_attachment(image_data, maintype='image', subtype=image_type.split('/')[1], filename=image_name)
-    
-        # K?t n?i d?n server SMTP và g?i email
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(Sender_Email, Password)  # Ðang nh?p
-            smtp.send_message(newMessage)  # G?i email
-        
-        print('Email sent successfully!')
-    
-    except FileNotFoundError:
-        print(f"Error: File not found - {image}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+# Cấu hình GPIO
+TILT_PIN = 17  # Chân GPIO cho cảm biến nghiêng (tùy chỉnh theo kết nối của bạn)
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(TILT_PIN, GPIO.IN)
 
-# Ví d? g?i hàm
-# Hãy thay th? 'path_to_image.jpg' b?ng du?ng d?n chính xác d?n t?p hình ?nh c?a b?n.
-# Ví dụ gọi hàm
+# Biến toàn cục
+is_checking_password = False
+i = 0
+Sender_email = "your_sender_email@gmail.com"  # Địa chỉ email gửi
+pass_sender = "your_app_password"  # Mật khẩu ứng dụng
+Reciever_Email = "recipient_email@gmail.com"  # Địa chỉ email nhận
+
+# Hàm gửi email
+def SendEmail(sender, password, receiver, image_path):
+    newMessage = EmailMessage()
+    newMessage['Subject'] = "CANH BAO !!!"
+    newMessage['From'] = sender
+    newMessage['To'] = receiver
+    newMessage.set_content('CANH BAO AN NINH')
+    
+    with open(image_path, 'rb') as f:
+        image_data = f.read()
+        image_type = imghdr.what(f.name)
+        image_name = f.name
+        newMessage.add_attachment(image_data, maintype='image', subtype=image_type, filename=image_name)
+    
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(sender, password)
+        smtp.send_message(newMessage)
+
+# Hàm xử lý cảm biến nghiêng
+def Tilt_Handle():
+    global is_checking_password
+    tilt_sensor = GPIO.input(TILT_PIN)  # Đọc giá trị từ cảm biến nghiêng
+    if not is_checking_password and tilt_sensor:  # Nếu không kiểm tra mật khẩu và cảm biến ở trạng thái kích hoạt
+        global i
+        i += 1  # Tăng biến đếm ảnh
+        image_path = f"/home/Tun/Desktop/FacePass2/image/image_{i}.jpg"  # Tạo đường dẫn lưu ảnh
+        picam2.capture(image_path)  # Chụp ảnh và lưu vào thư mục
+        print('A photo has been taken')  # In thông báo đã chụp ảnh
+        time.sleep(10)  # Chờ 10 giây trước khi có thể chụp tiếp
+        SendEmail(Sender_email, pass_sender, Reciever_Email, image_path)  # Gửi email với ảnh đã chụp
+
+# Chạy hàm trong vòng lặp hoặc khi có sự kiện
+try:
+    while True:
+        Tilt_Handle()  # Gọi hàm xử lý cảm biến nghiêng
+        time.sleep(1)  # Thời gian chờ giữa các lần kiểm tra
+except KeyboardInterrupt:
+    print("Program stopped")
+finally:
+    GPIO.cleanup()  # Dọn dẹp cấu hình GPIO khi thoát
+
 SendEmail("duongtuan10082003@gmail.com", "vrrw tsqa aljl nbrk", "duongtuan1008@gmail.com", "/home/Tun/Desktop/FacePass2/image/path_to_image.jpg")

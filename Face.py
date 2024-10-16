@@ -14,11 +14,11 @@ import smtplib
 # Cấu hình GPIO
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
-SW_520D_PIN =24
+TILT_PIN =24
 RELAY_PIN = 17
 PIR_PIN=18
 GPIO.setup(PIR_PIN,GPIO.IN)
-GPIO.setup(SW_520D_PIN,GPIO.IN)
+GPIO.setup(TILT_PIN,GPIO.IN)
 GPIO.setup(RELAY_PIN, GPIO.OUT)
 # Định nghĩa chân GPIO cho hàng và cột
 ROW_PINS = [6, 13, 19, 26]  # Các chân cho hàng R1, R2, R3, R4
@@ -224,6 +224,26 @@ def resetPass():
                 clear_data_input()  # Xóa dữ liệu nhập khi sai mật khẩu
                 break  # Kết thúc nếu mật khẩu nhập sai
 # -------------xử lý dữ liệu từ cảm biến nghiêng --------------
+def Tilt_Handle():
+    global is_checking_password,Sender_email,Reciever_Email,pass_sender
+    tilt_sensor = GPIO.input(TILT_PIN)  # Đọc giá trị từ cảm biến nghiêng
+    
+    # Kiểm tra nếu không đang kiểm tra mật khẩu và cảm biến ở trạng thái kích hoạt
+    if not is_checking_password and tilt_sensor:  
+        global i
+        i += 1  # Tăng biến đếm ảnh
+        
+        # Tạo đường dẫn cho ảnh
+        image_path = f"/home/Tun/Desktop/FacePass2/image/image_{i}.jpg"
+        
+        picam2.capture(image_path)  # Chụp ảnh và lưu vào đường dẫn đã tạo
+        print('A photo has been taken')  # In thông báo đã chụp ảnh
+        
+        time.sleep(10)  # Chờ 10 giây trước khi có thể chụp tiếp
+        
+        # Gửi email với ảnh đã chụp
+        SendEmail(Sender_email, pass_sender, Reciever_Email, image_path)  
+
 # ------------- send email khi phát hiện xâm nhập -------------
 def SendEmail (sender,pass_sender ,reciever , image):
     Sender_Email = sender
