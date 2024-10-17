@@ -10,6 +10,7 @@ import queue
 from email.message import EmailMessage
 import mimetypes
 import smtplib
+import imghdr
 
 # Cấu hình GPIO
 GPIO.setwarnings(False)
@@ -118,7 +119,7 @@ def read_line(row):
 
 # Hàm kiểm tra mật khẩu
 def check_pass():
-    global password_input, is_checking_password
+    global password_input, is_checking_password ,Sender_email, pass_sender, Reciever_Email
     while True:
         if len(data_input) < 5:  # Giả sử mật khẩu có 5 ký tự
             for row in ROW_PINS:
@@ -142,7 +143,8 @@ def check_pass():
             else:
                 print('Mật khẩu không đúng!')
                 GPIO.output(RELAY_PIN, GPIO.LOW)  # Tắt relay
-            
+                # Gửi email với ảnh đã chụp
+                SendEmail(Sender_email, pass_sender, Reciever_Email) 
             is_checking_password = False  # Đặt cờ là False sau khi kiểm tra xong
             clear_data_input()  # Xóa dữ liệu nhập sau khi kiểm tra
 # Hàm thay đổi mật khẩu
@@ -221,6 +223,8 @@ def resetPass():
                         return  # Thoát hàm reset sau khi hoàn thành
             else:
                 print('Mật khẩu không đúng!')
+                # Gửi email với ảnh đã chụp
+                SendEmail(Sender_email, pass_sender, Reciever_Email) 
                 clear_data_input()  # Xóa dữ liệu nhập khi sai mật khẩu
                 break  # Kết thúc nếu mật khẩu nhập sai
 # -------------xử lý dữ liệu từ cảm biến nghiêng --------------
@@ -241,43 +245,35 @@ def Tilt_Handle():
         
         time.sleep(10)  # Chờ 10 giây trước khi có thể chụp tiếp
         
-        # Gửi email với ảnh đã chụp
-        SendEmail(Sender_email, pass_sender, Reciever_Email, image_path)  
+         
 
 # ------------- send email khi phát hiện xâm nhập -------------
-def SendEmail (sender,pass_sender ,reciever , image):
-    Sender_Email = sender
-    Reciever_Email = reciever
-    Password = pass_sender
+def SendEmail (sender,pass_sender ,receiver):
+    # Tạo tên và đường dẫn lưu ảnh
+    image_path = f"/home/Tun/Desktop/FacePass2/image/path_to_image.jpg"
 
-    # tạo một EmailMessage mới 
-    newMessage = EmailMessage() 
-    newMessage['Subject'] = "CẢNH BÁO !!!" 
-    newMessage['From'] = Sender_Email 
-    newMessage['To'] = Reciever_Email
-
-    # thiết lập nội dung Email
-    text_content = " CẢNH BÁO AN NINH PHÁT HIỆN XÂM NHẬP : dưới đây là hình ảnh cần xem xét. "
-    newMessage.set_content(text_content)
-
-    # mã tệp hình ảnh và được dữ liệu 
-    try:
-        with open (image, 'rb')as f:
-            image_data = f.read()
-            image_type = mimetypes.guess_type(f.name) # Xác định loại hình ảnh
-            image_name = f.name.split("/")[-1] # Lấy tên tệp hình ảnh
-            
-            # thiết lập hình ảnh vào Email
-            newMessage.add_attachment(image_data, maintype='image', subtype=image_type.split('/')[1], filename=image_name)
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(Sender_Email, Password)  # Ðang nhap
-            smtp.send_message(newMessage)  # Gui email
-        
-        print('Email sent successfully!')
-    except FileNotFoundError:
-        print(f"Error: File not found - {image}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    # Chụp ảnh trực tiếp từ camera
+    picam2.capture_file(image_path)
+    print(f'A photo has been taken and saved at {image_path}')  # Thông báo ảnh đã được chụp
+    newMessage = EmailMessage()
+    newMessage['Subject'] = "CANH BAO !!!"
+    newMessage['From'] = sender
+    newMessage['To'] = receiver
+    newMessage.set_content('CANH BAO AN NINH')
+    
+    with open(image_path, 'rb') as f:
+        image_data = f.read()
+        image_type = imghdr.what(f)
+        # Đặt định dạng mặc định là 'jpeg' nếu không xác định được định dạng
+        if image_type is None:
+            image_type = 'jpeg'
+        image_name = f.name
+        newMessage.add_attachment(image_data, maintype='image', subtype=image_type, filename=image_name)
+    
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(sender, pass_sender)
+        smtp.send_message(newMessage)
+    print("Email đã được gửi với ảnh đính kèm.")
 #-------------- hàm chính -------------------
 print("Cửa khóa")
 GPIO.output(RELAY_PIN, GPIO.LOW)

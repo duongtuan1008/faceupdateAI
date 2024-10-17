@@ -1,6 +1,7 @@
 import RPi.GPIO as GPIO
+from RPLCD.i2c import CharLCD
 import time
-
+lcd = CharLCD('PCF8574', 0x27, cols=16, rows=2)
 # Định nghĩa mật khẩu và biến
 password = "11111"
 pass_def = "12345"
@@ -11,7 +12,7 @@ new_pass1 = [''] * 5
 new_pass2 = [''] * 5
 data_input = []
 RELAY_PIN = 17
-
+x=0
 # Định nghĩa chân GPIO cho hàng và cột
 ROW_PINS = [6, 13, 19, 26]  # Các chân cho hàng R1, R2, R3, R4
 COL_PINS = [12, 16, 20, 21]  # Các chân cho cột C1, C2, C3, C4
@@ -66,6 +67,10 @@ def compareData(data1=[], data2=[]):
 def clear_data_input():
     global data_input
     data_input = []
+    for i in range(5):
+        lcd.cursor_pos = (1, 5 + i)
+        lcd.write_string(' ')  # Xóa từng ký tự bằng cách in khoảng trắng
+    lcd.cursor_pos = (1, 5)  # Đặt lại con trỏ về vị trí ban đầu
 
 # Hàm ghi mật khẩu mới vào EEPROM (giả lập)
 def writeEpprom(new_pass):
@@ -74,14 +79,28 @@ def writeEpprom(new_pass):
 
 # Hàm đọc từng dòng của bàn phím
 def read_line(row):
+    global x  # Sử dụng biến toàn cục x để theo dõi vị trí hiện tại
+    lcd.cursor_pos = (0,1)
+    lcd.write_string("Enter Password")
     GPIO.output(row, GPIO.HIGH)  # Kích hoạt hàng hiện tại
     for i, col in enumerate(COL_PINS):
-        if GPIO.input(col) == 1:
-            key_pressed = KEYPAD[ROW_PINS.index(row)][i]  # Lấy ký tự tương ứng
-            print(f"Key pressed: {key_pressed}")
-            data_input.append(key_pressed)  # Thêm ký tự vào data_input
-            time.sleep(0.3)  # Tạm dừng để tránh trùng lặp
+        if GPIO.input(col) == GPIO.HIGH:  # Kiểm tra xem phím có được nhấn không
+            key = KEYPAD[ROW_PINS.index(row)][i]  # Lấy ký tự từ ma trận KEYPAD
+
+            # Hiển thị ký tự tại vị trí con trỏ và sau đó thay thế bằng "*"
+            if len(data_input) < 5:
+                data_input.append(key)  # Thêm ký tự vào mảng
+                lcd.cursor_pos = (1, 6 + x)  # Đặt vị trí con trỏ ở hàng 1 và cột tiếp theo
+                lcd.write_string(key)  # Hiển thị ký tự trên LCD
+                time.sleep(0.3)  # Tạm dừng để tránh trùng lặp
+                lcd.cursor_pos = (1, 6 + x)  # Đặt lại vị trí con trỏ
+                lcd.write_string("*")  # In dấu "*" thay cho ký tự đã nhập
+                x += 1  # Tăng biến đếm vị trí cho ký tự tiếp theo
+            else:
+                # Nếu đủ 5 ký tự, có thể xử lý hoặc reset lại nếu cần
+                print(f"Đã nhập đủ: {''.join(data_input)}")
     GPIO.output(row, GPIO.LOW)  # Tắt hàng hiện tại
+
 
 # Hàm kiểm tra mật khẩu
 def check_pass():
